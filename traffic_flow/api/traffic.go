@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	db "smart_city/traffic_flow/db/sqlc"
 	"strconv"
 	"time"
-	db "smart_city/traffic_flow/db/sqlc"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -29,10 +29,10 @@ func (server *Server) recordTrafficData(ctx *gin.Context) {
 	}
 
 	arg := db.RecordTrafficDataParams{
-		SensorID:      req.SensorID,
-		Timestamp:     pgtype.Timestamp{Time: time.Now(), Valid: true},
-		TrafficVolume: req.TrafficVolume,
-		AverageSpeed:  req.AverageSpeed,
+		SensorID:        req.SensorID,
+		Timestamp:       pgtype.Timestamp{Time: time.Now(), Valid: true},
+		TrafficVolume:   req.TrafficVolume,
+		AverageSpeed:    req.AverageSpeed,
 		CongestionLevel: db.CongestionLevelType(req.CongestionLevel),
 	}
 
@@ -49,14 +49,14 @@ func (server *Server) recordTrafficData(ctx *gin.Context) {
 }
 
 type getTrafficDataRequest struct {
-	SensorID  int32  `form:"sensor_id" binding:"required"`
-	StartTime string `form:"start_time" binding:"required"`
-	EndTime   string `form:"end_time" binding:"required"`
+	SensorID  int32  `json:"sensor_id" binding:"required"`
+	StartTime string `json:"start_time" binding:"required"`
+	EndTime   string `json:"end_time" binding:"required"`
 }
 
 func (server *Server) getTrafficDataBySensor(ctx *gin.Context) {
 	var req getTrafficDataRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
@@ -106,13 +106,13 @@ func (server *Server) getLatestTrafficData(ctx *gin.Context) {
 }
 
 type trafficStatsRequest struct {
-	StartTime string `form:"start_time" binding:"required"`
-	EndTime   string `form:"end_time" binding:"required"`
+	StartTime string `json:"start_time" binding:"required"`
+	EndTime   string `json:"end_time" binding:"required"`
 }
 
 func (server *Server) getHighCongestionAreas(ctx *gin.Context) {
 	var req trafficStatsRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
@@ -151,48 +151,15 @@ func (server *Server) getHighCongestionAreas(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, congestionAreas)
 }
 
-func (server *Server) getDailyTrafficStats(ctx *gin.Context) {
-	var req trafficStatsRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	startTime, err := time.Parse(time.RFC3339, req.StartTime)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_time format, use RFC3339"})
-		return
-	}
-
-	endTime, err := time.Parse(time.RFC3339, req.EndTime)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_time format, use RFC3339"})
-		return
-	}
-
-	arg := db.GetDailyTrafficStatsParams{
-		Timestamp:   pgtype.Timestamp{Time: startTime, Valid: true},
-		Timestamp_2: pgtype.Timestamp{Time: endTime, Valid: true},
-	}
-
-	stats, err := server.store.GetDailyTrafficStats(ctx, arg)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	ctx.JSON(http.StatusOK, stats)
-}
-
 type trafficAveragesRequest struct {
-	SensorID  int32  `form:"sensor_id" binding:"required"`
-	StartTime string `form:"start_time" binding:"required"`
-	EndTime   string `form:"end_time" binding:"required"`
+	SensorID  int32  `json:"sensor_id" binding:"required"`
+	StartTime string `json:"start_time" binding:"required"`
+	EndTime   string `json:"end_time" binding:"required"`
 }
 
 func (server *Server) getTrafficAverages(ctx *gin.Context) {
 	var req trafficAveragesRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
@@ -226,7 +193,7 @@ func (server *Server) getTrafficAverages(ctx *gin.Context) {
 
 func (server *Server) getSensorCongestionDistribution(ctx *gin.Context) {
 	var req trafficStatsRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
@@ -300,7 +267,7 @@ func (server *Server) handleWebSocket(ctx *gin.Context) {
 }
 
 // broadcastTrafficUpdate sends traffic updates to all connected clients
-func (server *Server) broadcastTrafficUpdate(data interface{}) {
+func (server *Server) broadcastTrafficUpdate(data any) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Error().Err(err).Msg("Error marshalling traffic data for WebSocket broadcast")
@@ -321,18 +288,17 @@ func (server *Server) broadcastTrafficUpdate(data interface{}) {
 // startBackgroundUpdates periodically sends traffic updates to WebSocket clients
 func (server *Server) startBackgroundUpdates() {
 	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				data, err := server.store.GetLatestTrafficData(context.Background(), 20)
-				if err != nil {
-					log.Error().Err(err).Msg("Error getting latest traffic data for WebSocket update")
-					continue
-				}
-				if len(data) > 0 {
-					server.broadcastTrafficUpdate(data)
-				}
+		for range ticker.C {
+			data, err := server.store.GetLatestTrafficData(context.Background(), 20)
+			if err != nil {
+				log.Error().Err(err).Msg("Error getting latest traffic data for WebSocket update")
+				continue
+			}
+			if len(data) > 0 {
+				server.broadcastTrafficUpdate(data)
 			}
 		}
 	}()

@@ -1,14 +1,12 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	db "smart_city/traffic_flow/db/sqlc"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 )
 
 type ServerConfig struct {
@@ -84,16 +82,18 @@ func (server *Server) setupRouter(config ServerConfig) {
 			sensors.PUT("/:sensor_id", server.updateSensor)
 			sensors.DELETE("/:sensor_id", server.deleteSensor)
 		}
-	}
 
-	// Traffic data endpoints
-	router.POST("/api/traffic/record", server.recordTrafficData)
-	router.GET("/api/traffic/by-sensor", server.getTrafficDataBySensor)
-	router.GET("/api/traffic/latest", server.getLatestTrafficData)
-	router.GET("/api/traffic/high-congestion", server.getHighCongestionAreas)
-	router.GET("/api/traffic/daily-stats", server.getDailyTrafficStats)
-	router.GET("/api/traffic/averages", server.getTrafficAverages)
-	router.GET("/api/traffic/congestion-distribution", server.getSensorCongestionDistribution)
+		// Traffic data endpoints
+		traffic := api.Group("/traffic")
+		{
+			traffic.POST("/record", server.recordTrafficData)
+			traffic.GET("/by-sensor", server.getTrafficDataBySensor)
+			traffic.GET("/latest", server.getLatestTrafficData)
+			traffic.GET("/high-congestion", server.getHighCongestionAreas)
+			traffic.GET("/averages", server.getTrafficAverages)
+			traffic.GET("/congestion-distribution", server.getSensorCongestionDistribution)
+		}
+	}
 
 	// WebSocket endpoint for real-time updates
 	router.GET("/ws/traffic", server.handleWebSocket)
@@ -104,7 +104,7 @@ func (server *Server) setupRouter(config ServerConfig) {
 func (server *Server) Start(address string) error {
 	// Start the background goroutine to send updates to WebSocket clients
 	server.startBackgroundUpdates()
-	
+
 	return server.router.Run(address)
 }
 
@@ -119,9 +119,7 @@ func (server *Server) registerClient(client *Client) {
 func (server *Server) unregisterClient(client *Client) {
 	server.wsLock.Lock()
 	defer server.wsLock.Unlock()
-	if _, ok := server.wsClients[client]; ok {
-		delete(server.wsClients, client)
-	}
+	delete(server.wsClients, client)
 }
 
 func errorResponse(err error) gin.H {

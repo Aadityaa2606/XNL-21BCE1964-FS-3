@@ -8,7 +8,7 @@ startcontainer: ## Start PostgreSQL container
 		-e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
 		-e POSTGRES_DB=$(DB_NAME) \
 		-p $(DB_PORT):$(DB_PORT) \
-		-d timescale/timescaledb-ha:pg17.4-ts2.18.2 || sudo docker start $(POSTGRES_CONTAINER_NAME)
+		-d timescale/timescaledb:latest-pg17 || sudo docker start $(POSTGRES_CONTAINER_NAME)
 
 stopcontainer: ## Stop PostgreSQL container
 	sudo docker stop $(POSTGRES_CONTAINER_NAME) || true
