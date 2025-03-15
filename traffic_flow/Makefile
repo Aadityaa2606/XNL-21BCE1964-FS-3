@@ -4,9 +4,9 @@ include .env
 
 startcontainer: ## Start PostgreSQL container
 	sudo docker run --name $(POSTGRES_CONTAINER_NAME) \
-		-e POSTGRES_USER=$(DB_USER) \
+		-e POSTGRES_USER=$(POSTGRES_USER) \
 		-e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
-		-e POSTGRES_DB=$(DB_NAME) \
+		-e POSTGRES_DB=$(POSTGRES_DB) \
 		-p $(DB_PORT):$(DB_PORT) \
 		-d timescale/timescaledb:latest-pg17 || sudo docker start $(POSTGRES_CONTAINER_NAME)
 
@@ -22,7 +22,7 @@ resetdb: ## Resets the database
 	make startcontainer
 
 psql: ## Connect to PostgreSQL with psql
-	sudo docker exec -it $(POSTGRES_CONTAINER_NAME) psql --username=$(DB_USER) --dbname=$(DB_NAME)
+	sudo docker exec -it $(POSTGRES_CONTAINER_NAME) psql --username=$(POSTGRES_USER) --dbname=$(POSTGRES_DB)
 
 migrateup: ## Run all pending migrations
 	goose -dir $(GOOSE_MIGRATION_DIR) postgres "$(DB_SOURCE)" up

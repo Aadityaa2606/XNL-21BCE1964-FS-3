@@ -1,0 +1,35 @@
+services:
+  timescale:
+    image: timescale/timescaledb:latest-pg17
+    env_file:
+      - ./traffic_flow/.env
+    environment:
+      - POSTGRES_DB=traffic_flow_db
+    ports:
+      - "5432:5432"
+  user_management:
+    build:
+      context: ./user_management
+      dockerfile: user-service.dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./user_management/.env
+    environment:
+      - GIN_MODE=release
+    entrypoint: [ "/app/start.sh" ]
+    command: [ "/app/main" ]
+  traffic_flow:
+    build:
+      context: ./traffic_flow
+      dockerfile: traffic-flow.dockerfile
+    ports:
+      - "9090:9090"
+    env_file:
+      - ./traffic_flow/.env
+    environment:
+      - GIN_MODE=release
+    depends_on:
+      - timescale
+    entrypoint: [ "/app/wait-for.sh", "timescale:5432", "--", "/app/start.sh" ]
+    command: [ "/app/main" ]
