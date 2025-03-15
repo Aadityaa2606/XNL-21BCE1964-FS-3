@@ -1,0 +1,6 @@
+type_id,type_name,description,domain
+1,loop_detector,Embedded wire loops that detect vehicles by electromagnetic induction,traffic-flow
+2,camera_vision,Computer vision cameras that count vehicles and track movement patterns,traffic-flow
+3,infrared_sensor,Thermal detection sensors that identify vehicle heat signatures,traffic-flow
+4,bluetooth_beacon,Detects Bluetooth devices in vehicles to measure travel times,traffic-flow
+5,radar_detector,Uses radar technology to count vehicles and measure speeds,traffic-flow

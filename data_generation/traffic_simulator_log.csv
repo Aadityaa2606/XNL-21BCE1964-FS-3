@@ -1,0 +1,6 @@
+timestamp,sensor_id,traffic_volume,average_speed,congestion_level,sensor_type
+2025-03-15T12:18:53.148023Z,36,379,54.5,moderate,bluetooth_beacon
+2025-03-15T12:19:47.949911Z,7,312,34.6,high,loop_detector
+2025-03-15T12:20:21.522392Z,28,410,6.8,high,radar_detector
+2025-03-15T12:21:14.63272Z,10,230,42,low,camera_vision
+2025-03-15T12:21:16.044799Z,46,179,42.9,moderate,bluetooth_beacon
