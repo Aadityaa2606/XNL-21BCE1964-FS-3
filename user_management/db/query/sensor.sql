@@ -20,3 +20,11 @@ WHERE contribution_id = $1;
 -- name: CountUserContributions :one
 SELECT COUNT(*) FROM user_contributed_sensors
 WHERE user_id = $1;
+
+-- name: ListAllSensors :many
+SELECT * FROM user_contributed_sensors
+ORDER BY contributed_at DESC
+LIMIT $1 OFFSET $2;
+
+-- name: GetTotalSensorCount :one
+SELECT COUNT(*) FROM user_contributed_sensors;

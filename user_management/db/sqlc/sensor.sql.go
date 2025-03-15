@@ -60,6 +60,17 @@ func (q *Queries) DeleteUserContribution(ctx context.Context, contributionID int
 	return err
 }
 
+const getTotalSensorCount = `-- name: GetTotalSensorCount :one
+SELECT COUNT(*) FROM user_contributed_sensors
+`
+
+func (q *Queries) GetTotalSensorCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getTotalSensorCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getUserContributions = `-- name: GetUserContributions :many
 SELECT contribution_id, user_id, service, service_sensor_id, contributed_at FROM user_contributed_sensors
 WHERE user_id = $1
@@ -68,6 +79,43 @@ ORDER BY contributed_at DESC
 
 func (q *Queries) GetUserContributions(ctx context.Context, userID int32) ([]UserContributedSensor, error) {
 	rows, err := q.db.Query(ctx, getUserContributions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserContributedSensor{}
+	for rows.Next() {
+		var i UserContributedSensor
+		if err := rows.Scan(
+			&i.ContributionID,
+			&i.UserID,
+			&i.Service,
+			&i.ServiceSensorID,
+			&i.ContributedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllSensors = `-- name: ListAllSensors :many
+SELECT contribution_id, user_id, service, service_sensor_id, contributed_at FROM user_contributed_sensors
+ORDER BY contributed_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListAllSensorsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListAllSensors(ctx context.Context, arg ListAllSensorsParams) ([]UserContributedSensor, error) {
+	rows, err := q.db.Query(ctx, listAllSensors, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

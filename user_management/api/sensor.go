@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv" // Add this import for string conversion
 
 	db "smart_city/user_management/db/sqlc"
 	"smart_city/user_management/util/token"
@@ -23,7 +24,7 @@ type createSensorResponse struct {
 	ContributedAt   pgtype.Timestamp `json:"contributed_at"`
 }
 
-func (server *Server) createSensor(ctx *gin.Context) {
+func (server *Server) createSensorContribution(ctx *gin.Context) {
 	var req createSensorRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
@@ -143,4 +144,74 @@ func (server *Server) deleteSensor(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusNoContent, nil)
+}
+
+type listAllSensorsRequest struct {
+	Limit  int32 `form:"limit" binding:"required,min=1"`
+	Offset int32 `form:"offset" binding:"min=0"`
+}
+
+type listAllSensorsResponse struct {
+	Count    int32                  `json:"count"`
+	Next     string                 `json:"next"`
+	Previous string                 `json:"previous"`
+	Results  []createSensorResponse `json:"results"`
+}
+
+func (server *Server) listAllSensors(ctx *gin.Context) {
+	var req listAllSensorsRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	arg := db.ListAllSensorsParams{
+		Limit:  req.Limit,
+		Offset: req.Offset,
+	}
+
+	sensors, err := server.store.ListAllSensors(ctx, arg)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Get total count for pagination
+	totalCount, err := server.store.GetTotalSensorCount(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Build pagination URLs
+	baseURL := ctx.Request.URL.Path + "?"
+	nextOffset := req.Offset + req.Limit
+	prevOffset := req.Offset - req.Limit
+
+	rsp := listAllSensorsResponse{
+		Count:   int32(totalCount),
+		Results: []createSensorResponse{},
+	}
+
+	// Set next URL if there are more records
+	if nextOffset < int32(totalCount) {
+		rsp.Next = baseURL + "limit=" + strconv.Itoa(int(req.Limit)) + "&offset=" + strconv.Itoa(int(nextOffset))
+	}
+
+	// Set previous URL if we're not at the beginning
+	if prevOffset >= 0 {
+		rsp.Previous = baseURL + "limit=" + strconv.Itoa(int(req.Limit)) + "&offset=" + strconv.Itoa(int(prevOffset))
+	}
+
+	for _, sensor := range sensors {
+		rsp.Results = append(rsp.Results, createSensorResponse{
+			ContributionID:  sensor.ContributionID,
+			UserID:          sensor.UserID,
+			Service:         sensor.Service,
+			ServiceSensorID: sensor.ServiceSensorID,
+			ContributedAt:   sensor.ContributedAt,
+		})
+	}
+
+	ctx.JSON(http.StatusOK, rsp)
 }

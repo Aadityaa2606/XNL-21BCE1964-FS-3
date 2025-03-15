@@ -82,9 +82,10 @@ func (server *Server) setupRouter(config ServerConfig) {
 	authRoutes := router.Group("/").Use(authMiddleware(server.tokenMaker))
 
 	authRoutes.POST("/users/refresh", server.renewAccessToken)
-	authRoutes.POST("/sensors", server.createSensor)
+	authRoutes.POST("/sensors", server.createSensorContribution)
 	authRoutes.GET("/sensors", server.getUserContributions)
 	authRoutes.DELETE("/sensors/:contribution_id", server.deleteSensor)
+	authRoutes.GET("/sensors/all", server.listAllSensors)
 	server.router = router
 }
 
